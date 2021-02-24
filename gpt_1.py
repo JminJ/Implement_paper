@@ -10,6 +10,9 @@ class Embedding(nn.Module):
         self.input_size = input_size
         self.embedding_size = embedding_size
 
+        self.embedding = nn.Embedding(self.input_size, self.embedding_size)
+
+    ### positional encodding~
     def cal_positional_encodding(self, position_now, i): # 현재 position과 i를 사용해 pos_encodding을 연산
         pos_encodding = position_now / torch.pow(10000, (2*(i//2))/self.embedding_size)
         return pos_encodding
@@ -23,5 +26,51 @@ class Embedding(nn.Module):
         sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])
 
         return sinusoid_table # 이것이 positional encodding 결과값
+    ### ~positional encodding
+
+    ### embedding~
+    def cal_embedding(self):
+        embedding_input = self.embedding(self.input) / self.embedding_size**0.5 # embedding_size(d_model)의 루트로 나눠준다.
+        pos_embedding = get_sinusoiding_table()
+
+        return embedding_input + pos_embedding
+    ### ~embedding
+
+class masking():
+    def __init__(self, input, Q_size, K_size):
+        self.input = input # input은 rnn_sequence_pad를 통해 패딩 된 상태의 값입니다.
+        self.Q_size = Q_size
+        self.K_size = K_size
+
+    def fill_mask(self):
+        # match_sized_input = torch.masked_fill(self.input)
+        input_zero = self.input.eq(0).unsqueeze(1).expand(self.Q_size[0], self.Q_size[1], self.K_size[1])
+        print('|input_zero| :', input_zero.size())
+
+        mask_vec = torch.ones_like(self.input).expand(self.Q_size[0], self.Q_size[1], self.K_size[1])
+        mask_vec = torch.triu(mask_vec)
+
+        plus_result = torch.gt((input_zero + mask_vec), 0) # triu된 값과 input에서 패딩(0)된 부분을 torch.gt를 통해 합친다.
+        # print(plus_result[1])
+
+        return plus_result
+        
+class self_dot_attention(nn.Module):
+    def __init__(self, Q, K, V):
+        self.Q = Q
+        self.K = K
+        self.V = V
+        self.softmax = nn.Softmax()
+
+    def self_attn(self):
+        matmul = torch.bmm(Q, torch.transpose(K,1,2)) / self.K.size(-1) ** 2
+        soft_mat = self.softmax(mat)
+        mul_v = torch.bmm(mul_v, self.V)
+
+        return mul_v
+
+
+
+
         
         
