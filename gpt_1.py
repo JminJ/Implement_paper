@@ -8,7 +8,7 @@ class Embedding(nn.Module):
         self.input = input
         self.input_len = input.size()
         self.input_size = input_size
-        self.embedding_size = embedding_size
+        self.embedding_size = embedding_size # gpt-1 : 768
 
         self.embedding = nn.Embedding(self.input_size, self.embedding_size)
 
@@ -56,21 +56,50 @@ class masking():
         return plus_result
         
 class self_dot_attention(nn.Module):
-    def __init__(self, Q, K, V):
+    def __init__(self, Q, K, V): # multi-head-attention에서 나눈 Q, K, V
         self.Q = Q
         self.K = K
         self.V = V
         self.softmax = nn.Softmax()
 
-    def self_attn(self):
-        matmul = torch.bmm(Q, torch.transpose(K,1,2)) / self.K.size(-1) ** 2
-        soft_mat = self.softmax(mat)
-        mul_v = torch.bmm(mul_v, self.V)
+    def forward(self, attn_mask):
+        # Q와 K를 matmul하고 scale을 한다.
+        matmul = torch.matmul(Q, torch.transpose(K,-1, -2)) / self.K.size(-1) ** 2
+        print(matmul.size())
+
+        # masking을 한다.
+        matmul.masked_fill(attn_mask, -1e9)
+
+        # mask를 추가한 값을 softmax에 넣고 V와 곱해준다.
+        soft_mat = self.softmax(matmul, dim=-1)
+        mul_v = torch.matmul(soft_mat, self.V)
 
         return mul_v
 
+class multi_head_attention(nn.Module):
+    def __init__(self, Q, K, V, n_head, batch_size):
+        self.Q = Q
+        self.K = K
+        self.V = V
+        self.n_head = n_head # gpt-1 : 12
+        self.d_head = Q.size(-1) / n_head # 768(d_model = Q.size(-1) = embedding_size) / 12
+        self.batch_size = batch_size
 
+    def cal_multihead_attention(self, input):
+        Q_head = nn.Linear(self.Q.size(-1), self.n_head * self.head_linear) # (bs, seq, d_model)
+        K_head = nn.Linear(self.K.size(-1), self.n_head * self.head_linear)
+        V_head = nn.Linear(self.V.size(-1), self.n_head * self.head_linear)
 
+        Q_head = Q_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2) # (bs, seq, n_head, d_head) => (bs, n_head, seq, d_head)
+        K_head = K_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
+        V_head = V_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
 
-        
+        attn_mask = input.eq(0).unsqueeze(1).expand(self.Q.size(0), self.Q.size(1), self.K.size(1))
+        multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1)
+
+        self_dot_attn = self_dot_attention(Q_head, K_head, V_head)
+        multi_attn_result = self_dot_attn(attn_mask)
+
+        concat_result = nn.Linear(self.d_head, self.n_head * self.d_head)
+
         
