@@ -29,7 +29,7 @@ class Embedding(nn.Module):
     ### ~positional encodding
 
     ### embedding~
-    def cal_embedding(self):
+    def forward(self):
         embedding_input = self.embedding(self.input) / self.embedding_size**0.5 # embedding_size(d_model)의 루트로 나눠준다.
         pos_embedding = get_sinusoiding_table()
 
@@ -42,7 +42,7 @@ class masking():
         self.Q_size = Q_size
         self.K_size = K_size
 
-    def fill_mask(self):
+    def forward(self):
         # match_sized_input = torch.masked_fill(self.input)
         input_zero = self.input.eq(0).unsqueeze(1).expand(self.Q_size[0], self.Q_size[1], self.K_size[1])
         print('|input_zero| :', input_zero.size())
@@ -77,15 +77,19 @@ class self_dot_attention(nn.Module):
         return mul_v
 
 class multi_head_attention(nn.Module):
-    def __init__(self, Q, K, V, n_head, batch_size):
+    def __init__(self, Q, K, V, n_head, batch_size, d_model): # d_model을 빼고 Q.size(-1)을 쓸까 고민...
         self.Q = Q
         self.K = K
         self.V = V
         self.n_head = n_head # gpt-1 : 12
-        self.d_head = Q.size(-1) / n_head # 768(d_model = Q.size(-1) = embedding_size) / 12
+        self.d_model = d_model
+        # self.d_head = self.Q.size(-1) / n_head
+        self.d_head = self.d_model / n_head # 768(d_model = Q.size(-1) = embedding_size) / 12
         self.batch_size = batch_size
+        
+        self.linear_WO = nn.Linear(self.d_model, self.d_model)
 
-    def cal_multihead_attention(self, input):
+    def forward(self, input):
         Q_head = nn.Linear(self.Q.size(-1), self.n_head * self.head_linear) # (bs, seq, d_model)
         K_head = nn.Linear(self.K.size(-1), self.n_head * self.head_linear)
         V_head = nn.Linear(self.V.size(-1), self.n_head * self.head_linear)
@@ -94,12 +98,17 @@ class multi_head_attention(nn.Module):
         K_head = K_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
         V_head = V_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
 
-        attn_mask = input.eq(0).unsqueeze(1).expand(self.Q.size(0), self.Q.size(1), self.K.size(1))
-        multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1)
+        attn_mask = input.eq(0).unsqueeze(1).expand(self.Q.size(0), self.Q.size(1), self.K.size(1)) # input들의 padding 부분을 true로 하는 mask를 만든다.
+        multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다.
 
-        self_dot_attn = self_dot_attention(Q_head, K_head, V_head)
-        multi_attn_result = self_dot_attn(attn_mask)
+        self_dot_attn = self_dot_attention(Q_head, K_head, V_head) # self-dot-attention
+        multi_attn_result = self_dot_attn(multi_attn_mask)
 
-        concat_result = nn.Linear(self.d_head, self.n_head * self.d_head)
+        concat_result = multi_attn_result.contiguous().view(self.batch_size, -1, self.d_model) # self-dot-attention의 결과를 concatenation한다.
 
-        
+        result = self.linear_WO(concat_result)
+
+        return result
+
+
+
