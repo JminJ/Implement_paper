@@ -4,6 +4,7 @@ import numpy as np
 
 class Embedding(nn.Module):
     def __init__(self, input, input_size, embedding_size):
+        super(Embedding, self).__init__()
         # input은 bpe 알고리즘으로 전처리 및 0으로 padding 되어있을 것입니다.
         self.input = input
         self.input_len = input.size()
@@ -57,6 +58,7 @@ class masking():
         
 class self_dot_attention(nn.Module):
     def __init__(self, Q, K, V): # multi-head-attention에서 나눈 Q, K, V
+        super(self_dot_attention, self).__init__()
         self.Q = Q
         self.K = K
         self.V = V
@@ -78,6 +80,7 @@ class self_dot_attention(nn.Module):
 
 class multi_head_attention(nn.Module):
     def __init__(self, Q, K, V, n_head, batch_size, d_model): # d_model을 빼고 Q.size(-1)을 쓸까 고민...
+        super(multi_head_attention, self).__init__()
         self.Q = Q
         self.K = K
         self.V = V
@@ -109,6 +112,26 @@ class multi_head_attention(nn.Module):
         result = self.linear_WO(concat_result)
 
         return result
+
+class position_wise_FFN(nn.Module):
+    def __init__(self, d_model):
+        super(position_wise_FFNN, self).__init__()
+        self.linear1 = nn.Linear(d_model, d_model * 4)
+        self.GELU = nn.GELU()
+        self.linear2 = nn.Linear(d_model * 4, d_model)
+
+    def forward(self, input_x): # input_x = multi-head-attention 결과값(bs, seq, d_model)
+        linear_1st = self.linear1(input_x) # (bs, seq, d_model * 4)
+        gelu_result = self.GELU(linear_fir) 
+        linear_2nd = self.linear2(gelu_result) # (bs, seq, d_model) 
+
+        return linear_2nd
+
+
+
+
+
+
 
 
 
