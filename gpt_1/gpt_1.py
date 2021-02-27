@@ -70,7 +70,7 @@ class self_dot_attention(nn.Module):
         print(matmul.size())
 
         # masking을 한다.
-        matmul.masked_fill(attn_mask, -1e9)
+        matmul.masked_fill(attn_mask, '-inf')
 
         # mask를 추가한 값을 softmax에 넣고 V와 곱해준다.
         soft_mat = self.softmax(matmul, dim=-1)
@@ -78,7 +78,7 @@ class self_dot_attention(nn.Module):
 
         return mul_v
 
-class multi_head_attention(nn.Module):
+class masked_multi_head_attention(nn.Module):
     def __init__(self, Q, K, V, n_head, batch_size, d_model): # d_model을 빼고 Q.size(-1)을 쓸까 고민...
         super(multi_head_attention, self).__init__()
         self.Q = Q
@@ -101,8 +101,11 @@ class multi_head_attention(nn.Module):
         K_head = K_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
         V_head = V_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
 
-        attn_mask = input.eq(0).unsqueeze(1).expand(self.Q.size(0), self.Q.size(1), self.K.size(1)) # input들의 padding 부분을 true로 하는 mask를 만든다.
-        multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다.
+
+        attn_mask = masking() # masked-multi-head attention을 위해 triu를 적용한 masking 사용
+        multi_attn_mask = attn_mask(input, self.Q.size(), self.K.size()).unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다
+        
+        # multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다.
 
         self_dot_attn = self_dot_attention(Q_head, K_head, V_head) # self-dot-attention
         multi_attn_result = self_dot_attn(multi_attn_mask)
@@ -116,7 +119,7 @@ class multi_head_attention(nn.Module):
 class position_wise_FFN(nn.Module):
     def __init__(self, d_model):
         super(position_wise_FFNN, self).__init__()
-        self.linear1 = nn.Linear(d_model, d_model * 4)
+        self.linear1 = nn.Linear(d_model, d_model * 4) # transformer에서 4배를 해줌으로 4배로 지정해 보았습니다 :)
         self.GELU = nn.GELU()
         self.linear2 = nn.Linear(d_model * 4, d_model)
 
@@ -128,10 +131,41 @@ class position_wise_FFN(nn.Module):
         return linear_2nd
 
 
+class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_model = 768, self_attn_head = 12)
+    def __init__(self, input, n_layer, d_model, self_attn_head = 12):
+        super(transformer_block, self).__init__()
+        self.input = input
+        self.n_layer = n_layer
+        self.d_model = d_model
+        self.self_attn_head = self_attn_head
+
+        self.masked_multi_head_attn = masked_multi_head_attention(input, input, input, n_layer, d_model, self_attn_head)
+        self.position_wise = position_wise_FFN(d_model)
+
+        self.dropout = nn.Dropout(0.1) # 각 sub-layer(Add & Norm되기 전 작업들)마다 적용해 줄 dropout
+
+    def add_and_normalization(self, before_result, now_result):
+        new_result = before_result + now_result
+
+        layer_norm = nn.LayerNorm(new_result.size())
+        layer_norm_result = layer_norm(new_result)
+
+        return layer_norm_result
+
+    def block(self):
+        masked_result = self.masked_multi_head_attn(self.input)
+        masked_result = add_and_normalization(self.input, masked_result)
+
+        feed_for_result = self.position_wise(masked_result)
+        feed_for_result = add_and_normalization(masked_result, feed_for_result)
+
+        return feed_for_result
+
+    def forward(self):
+        for _ in range(self.n_layer):
+            result = block(self.input)
+            self.input = result
+            
 
 
-
-
-
-
-
+    
