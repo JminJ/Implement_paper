@@ -130,7 +130,6 @@ class position_wise_FFN(nn.Module):
 
         return linear_2nd
 
-
 class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_model = 768, self_attn_head = 12)
     def __init__(self, input, n_layer, d_model, self_attn_head = 12):
         super(transformer_block, self).__init__()
@@ -139,6 +138,9 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
         self.d_model = d_model
         self.self_attn_head = self_attn_head
 
+        self.result = None
+
+        self.softmax = nn.Softmax(dim = -1)
         self.masked_multi_head_attn = masked_multi_head_attention(input, input, input, n_layer, d_model, self_attn_head)
         self.position_wise = position_wise_FFN(d_model)
 
@@ -163,9 +165,16 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
 
     def forward(self):
         for _ in range(self.n_layer):
-            result = block(self.input)
-            self.input = result
-            
+            self.result = block(self.input) # n_layer의 수 만큼 block을 실행
+            self.input = self.result # self.result가 self.input으로 block의 입력으로 들어간다.
+
+        softmax_result = self.softmax(self.result) # transformer_block의 result를 softmax시킨다(transformer_block 단계와 softmax 단계를 합쳤다)
+
+        return softmax_result
+
+
+
+
 
 
     
