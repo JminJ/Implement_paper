@@ -3,15 +3,15 @@ import torch.nn as nn
 import numpy as np
 
 class Embedding(nn.Module):
-    def __init__(self, input, input_size, embedding_size):
+    def __init__(self, input, embedding_size):
         super(Embedding, self).__init__()
         # input은 bpe 알고리즘으로 전처리 및 0으로 padding 되어있을 것입니다.
         self.input = input
         self.input_len = input.size()
-        self.input_size = input_size
+        # self.input_size = input_size
         self.embedding_size = embedding_size # gpt-1 : 768
 
-        self.embedding = nn.Embedding(self.input_size, self.embedding_size)
+        self.embedding = nn.Embedding(self.input_len[-1], self.embedding_size) # self.input_len[-1] = (bs, seq, vocab_size)에서 vocab_size
 
     ### positional encodding~
     def cal_positional_encodding(self, position_now, i): # 현재 position과 i를 사용해 pos_encodding을 연산
@@ -131,7 +131,7 @@ class position_wise_FFN(nn.Module):
         return linear_2nd
 
 class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_model = 768, self_attn_head = 12)
-    def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head = 12): # encodding함수에서 vocab_size를 output으로 내놓아야 할 것
+    def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head = 12): ### encodding 함수에서 vocab_size를 output으로 내놓아야 할 것 ###
         super(transformer_block, self).__init__()
         self.input = input
         self.n_layer = n_layer
@@ -140,8 +140,6 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
 
         self.result = None
 
-        self.softmax = nn.Softmax(dim = -1)
-        self.soft_linear = nn.Linear(d_model, vocab_size)
         self.masked_multi_head_attn = masked_multi_head_attention(input, input, input, n_layer, d_model, self_attn_head)
         self.position_wise = position_wise_FFN(d_model)
 
@@ -169,7 +167,17 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
             self.result = block(self.input) # n_layer의 수 만큼 block을 실행
             self.input = self.result # self.result가 self.input으로 block의 입력으로 들어간다.
 
-        linear_result = self.soft_linear(self.result)
-        softmax_result = self.softmax(linear_result) # transformer_block의 result를 softmax시킨다(transformer_block 단계와 softmax 단계를 합쳤다)
+        return self.result
 
-        return softmax_result
+class GPT_pretrain(nn.Module):
+    def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head):
+        self.transformer_block = transformer_block(input, vocab_size, n_layer, d_model, self_attn_head)
+        self.embedding = Embedding(input, input_size, embedding_size)
+        self.linear = nn.Linear(d_model, vocab_size)
+        self.linear.weight = self.embedding.embedding.weight
+
+    def forward(self):
+        result_tran = self.transformer_block()
+        result_linear = self.linear(result_tran)
+
+        return result_linear[:, :-1, :].contiguous()
