@@ -2,39 +2,34 @@ import torch
 from torchtext import data
 import pandas as pd
 from eunjeon import Mecab
+import sentencepiece as spm
 
 mecab = Mecab()
 
-class Dataloader_fn(object):
-  def __init__(self, train_fn, batch_size = 64, valid_ratio = .2, device = -1, min_freq = 5, max_vocab = 99999, use_eos = False, shuffle = True):
+class Dataloader_Pre_train(object):
+  def __init__(self, train_fn, batch_size = 64, device = -1, min_freq = 5, max_vocab = 99999, use_eos = True, shuffle = True):
     # train_fn : train dataset path, max_vocab : max vocab size, min_freq : minimum frequency for loaded word
-    super(Dataloader_fn, self).__init__()
+    super(Dataloader_Pre_train, self).__init__()
 
-    self.label = data.Field(
-        sequential = False,
-        use_vocab = True,
-        unk_token = False
-    )
     self.text = data.Field(
         use_vocab = True,
         batch_first = True,
         include_lengths = False,
-        tokenize = mecab.morphs,
-        init_token = '<sos>',
-        eos_token = '<eos>'
+        init_token = '<BOS>',
+        eos_token = '<EOS>',
+        pad_token= '<PAD>'
+
     )
 
-    train, valid = data.TabularDataset(
-        path = '/content/drive/MyDrive/korean_smentic_dataset_ver_one.csv',
-        format = 'csv',
-        fields = [
-                  ('text', self.text),
-                  ('label', self.label),
-        ],
-    ).split(split_ratio = (1-valid_ratio))
+    train = data.TabularDataset(
+        path = 'Implement_paper\gpt_1\kowiki.sentence_piece.json',
+        format = 'json',
+        fields = {
+                  'document' : self.text,
+        },
+    )
 
-    self.train_loader, self.test_loader = data.BucketIterator.splits(
-        (train, valid),
+    self.train_loader = data.BucketIterator(
         batch_size = batch_size,
         device = 'cuda:%d' % device if device >= 0 else 'cpu',
         shuffle = shuffle,
@@ -42,5 +37,4 @@ class Dataloader_fn(object):
         sort_within_batch = True, 
     )
     
-    self.label.build_vocab(train)
-    self.text.build_vocab(train, max_size = max_vocab, min_freq = min_freq)
+    self.text.build_vocab(train, max_size = max_vocab, min_freq = min_freq)       
