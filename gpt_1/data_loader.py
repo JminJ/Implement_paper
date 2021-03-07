@@ -1,17 +1,13 @@
 import torch
 from torchtext import data
 import pandas as pd
-from eunjeon import Mecab
-import sentencepiece as spm
-
-mecab = Mecab()
 
 class Dataloader_Pre_train(object):
   def __init__(self, train_fn, batch_size = 64, device = -1, min_freq = 5, max_vocab = 99999, use_eos = True, shuffle = True):
     # train_fn : train dataset path, max_vocab : max vocab size, min_freq : minimum frequency for loaded word
     super(Dataloader_Pre_train, self).__init__()
 
-    self.text = data.Field(
+    self.pre_t = data.Field(
         use_vocab = True,
         batch_first = True,
         include_lengths = False,
@@ -22,10 +18,10 @@ class Dataloader_Pre_train(object):
     )
 
     train = data.TabularDataset(
-        path = 'Implement_paper\gpt_1\kowiki.sentence_piece.json',
+        path = 'Implement_paper\gpt_1\kowiki.sentence_piece_text.json',
         format = 'json',
         fields = {
-                  'document' : self.text,
+                  'document' : self.pre_t,
         },
     )
 
