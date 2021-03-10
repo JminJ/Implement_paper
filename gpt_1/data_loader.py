@@ -14,7 +14,6 @@ class Dataloader_Pre_train(object):
         init_token = '<BOS>',
         eos_token = '<EOS>',
         pad_token= '<PAD>'
-
     )
 
     train = data.TabularDataset(
@@ -26,6 +25,7 @@ class Dataloader_Pre_train(object):
     )
 
     self.train_loader = data.BucketIterator(
+        train,
         batch_size = batch_size,
         device = 'cuda:%d' % device if device >= 0 else 'cpu',
         shuffle = shuffle,
