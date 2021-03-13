@@ -51,7 +51,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
         # The output of sequence-to-sequence does not have BOS token. 
         # Thus, remove BOS token for reference.
         x = mini_batch.src
-        y = mini_batch.src[0][:,1:]
+        y = mini_batch.src[0][:,1:] # for pre-train
         # |x| = (batch_size, length)
         # |y| = (batch_size, length)
 
@@ -59,7 +59,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
             # Take feed-forward
             # Similar as before, the input of decoder does not have EOS token.
             # Thus, remove EOS token for decoder input.
-            y_hat = engine.model(x, mini_batch.tgt[0][:, :-1])
+            y_hat = engine.model(x, mini_batch.src[0][:, :-1])
             # |y_hat| = (batch_size, length, output_size)
 
             loss = engine.crit(
@@ -73,7 +73,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
         else:
             backward_target.backward()
 
-        word_count = int(mini_batch.tgt[1].sum())
+        word_count = int(mini_batch.src[1].sum())
         p_norm = float(get_parameter_norm(engine.model.parameters()))
         g_norm = float(get_grad_norm(engine.model.parameters()))
 
@@ -109,14 +109,13 @@ class MaximumLikelihoodEstimationEngine(Engine):
         with torch.no_grad():
             device = next(engine.model.parameters()).device
             mini_batch.src = (mini_batch.src[0].to(device), mini_batch.src[1])
-            mini_batch.tgt = (mini_batch.tgt[0].to(device), mini_batch.tgt[1])
-
-            x, y = mini_batch.src, mini_batch.tgt[0][:, 1:]
+            
+            x, y = mini_batch.src, mini_batch.src[0][:, 1:]
             # |x| = (batch_size, length)
             # |y| = (batch_size, length)
 
             with autocast(not engine.config.off_autocast):
-                y_hat = engine.model(x, mini_batch.tgt[0][:, :-1])
+                y_hat = engine.model(x, mini_batch.src[0][:, :-1])
                 # |y_hat| = (batch_size, n_classes)
                 loss = engine.crit(
                     y_hat.contiguous().view(-1, y_hat.size(-1)),
