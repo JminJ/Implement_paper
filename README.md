@@ -3,6 +3,6 @@
 ## Introduction
 * This repository is space implement papers. 
 * I usually use Pytorch library and Ignite.
-* Maybe, My codes are not correct. Then, Please send your coments to here <jminju254@gmail.com>.
+* Probably, My codes are not correct. Then, Please send your coments to here <jminju254@gmail.com>.
 
 ### Thanks to read this :)
