@@ -1,2 +1,8 @@
 # Implement_paper
-I moved TIL's Implement_paper folder to this repository.
+-----
+## Introduction
+* This repository is space implement papers. 
+* I usually use Pytorch library and Ignite.
+* Maybe, My codes are not correct. Then, Please send your coments to here <jminju254@gmail.com>.
+
+### Thanks to read this :)
