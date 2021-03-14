@@ -17,8 +17,8 @@ class Dataloader_Pre_train(object):
     )
 
     train = data.TabularDataset(
-        path = 'Implement_paper\gpt_1\kowiki.sentence_piece_text.json',
-        format = 'json',
+        path = 'Implement_paper\gpt_1\kowiki.sentence_piece_text.json', # change your data path
+        format = 'json', # change your data format
         fields = {
                   'document' : self.pre_t,
         },
