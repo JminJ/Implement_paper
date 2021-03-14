@@ -11,7 +11,7 @@ from ignite.engine import Events
 from ignite.metrics import RunningAverage
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 
-from simple_nmt.utils import get_grad_norm, get_parameter_norm
+from Implement_paper.gpt_1.utils import get_grad_norm, get_parameter_norm
 
 
 VERBOSE_SILENT = 0
