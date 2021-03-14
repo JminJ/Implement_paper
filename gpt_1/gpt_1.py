@@ -171,8 +171,8 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
 
 class GPT_pretrain(nn.Module):
     def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head):
-        self.transformer_block = transformer_block(input, vocab_size, n_layer, d_model, self_attn_head)
         self.embedding = Embedding(input, input_size, embedding_size)
+        self.transformer_block = transformer_block(embedding, vocab_size, n_layer, d_model, self_attn_head) # sentencepiece -> dataloader -> Embedding() -> trans?
         self.linear = nn.Linear(d_model, vocab_size)
         self.linear.weight = self.embedding.embedding.weight
 
