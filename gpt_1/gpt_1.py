@@ -5,7 +5,7 @@ import numpy as np
 class Embedding(nn.Module):
     def __init__(self, input, embedding_size):
         super(Embedding, self).__init__()
-        # input은 bpe 알고리즘으로 전처리 및 0으로 padding 되어있을 것입니다.
+        # input은 bpe 알고리즘으로 전처리 및 padding 되어있을 것입니다.
         self.input = input
         self.input_len = input.size()
         # self.input_size = input_size
