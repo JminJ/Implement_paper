@@ -59,7 +59,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
             # Take feed-forward
             # Similar as before, the input of decoder does not have EOS token.
             # Thus, remove EOS token for decoder input.
-            y_hat = engine.model(x, mini_batch.src[0][:, :-1])
+            y_hat = engine.model(x, y)
             # |y_hat| = (batch_size, length, output_size)
 
             loss = engine.crit(
@@ -115,14 +115,15 @@ class MaximumLikelihoodEstimationEngine(Engine):
             # |y| = (batch_size, length)
 
             with autocast(not engine.config.off_autocast):
-                y_hat = engine.model(x, mini_batch.src[0][:, :-1])
+                # y_hat = engine.model(x, mini_batch.src[0][:, :-1])
+                y_hat = engine.model(x, y)
                 # |y_hat| = (batch_size, n_classes)
                 loss = engine.crit(
                     y_hat.contiguous().view(-1, y_hat.size(-1)),
                     y.contiguous().view(-1),
                 )
         
-        word_count = int(mini_batch.tgt[1].sum())
+        word_count = int(mini_batch.src[1].sum())
         loss = float(loss / word_count)
         ppl = np.exp(loss)
 
@@ -253,14 +254,17 @@ class SingleTrainer():
             lr_scheduler,
             self.config
         )
-        validation_engine = self.target_engine_class(
-            self.target_engine_class.validate,
-            model,
-            crit,
-            optimizer=None,
-            lr_scheduler=None,
-            config=self.config
-        )
+
+        ### now don't use this code ###
+
+        # validation_engine = self.target_engine_class(
+        #     self.target_engine_class.validate,
+        #     model,
+        #     crit,
+        #     optimizer=None,
+        #     lr_scheduler=None,
+        #     config=self.config
+        # )
 
         # Do necessary attach procedure to train & validation engine.
         # Progress bar and metric would be attached.
