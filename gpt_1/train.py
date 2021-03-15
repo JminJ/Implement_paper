@@ -164,5 +164,53 @@ def get_model(input, config):
 
     return model
 
-def get_crit():
-    pass
+def get_crit(output_size, pad_index):
+    # PAD를 zero로 set한다.(PAD는 weight를 줄 필요가 없다.)
+    loss_weight = torch.ones(output_size)
+    loss_weight[pad_index] = 0.
+    # log-probability와 함께 Cross-Entropy loss 대신 NLL loss를 사용한다.
+    crit = nn.NLLoss(
+        weight = loss_weight,
+        reduction = 'sum'
+    )
+
+    return crit
+
+def get_optimizer(model, config):
+    optimizer = optim.Adam(model.parameters(), lr = config.lr, betas=(.9, .98))
+
+    return optimizer
+
+def get_scheduler(optimizer, config):
+    if config.lr_step > 0:
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(
+            # 함수 알아보기
+            optimizer,
+            milestones=[i for i in range(
+                max(0, config.lr_decay_start - 1),
+                (config.init_epoch -1) + config.n_epochs,
+                config.lr_step
+            )],
+            gamma = config.lr_gamma,
+            last_epoch=config.init_epoch - 1 if config.init_epoch > 1 else -1,
+        )
+    else:
+        lr_scheduler = None
+
+    return lr_scheduler
+
+def main(config, main_weight = None, opt_weight = None):
+    def print_config(config):
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(vars(config))
+    print_config(config)
+
+    loader = DataLoader(
+        config.train,
+        batch_size = config.batch_size,
+        device = -1,
+        max_length = config.max_length,
+    )
+
+    input_size, output_size = len(loader.src.vocab)
+    model = get_model(input, config)
