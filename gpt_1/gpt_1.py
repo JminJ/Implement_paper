@@ -6,9 +6,6 @@ class Embedding(nn.Module):
     def __init__(self, input, embedding_size):
         super(Embedding, self).__init__()
         # input은 bpe 알고리즘으로 전처리 및 padding 되어있을 것입니다.
-        self.input = input
-        self.input_len = input.size()
-        # self.input_size = input_size
         self.embedding_size = embedding_size # gpt-1 : 768
 
         self.embedding = nn.Embedding(self.input_len[-1], self.embedding_size) # self.input_len[-1] = (bs, seq, vocab_size)에서 vocab_size
@@ -21,8 +18,8 @@ class Embedding(nn.Module):
     def positional_encodding(self, position_now): # 현재 position 값과 embedding_size(768)를 사용해 cal_positoinal_encodding을 호출
         return [cal_positional_encodding(powition_now, i) for i in range(self.embedding_size)]
 
-    def get_sinusoiding_table(self): # 연산된 pos_encodding에 i값에 따라 sin, cos을 적용
-        sinusoid_table = np.array([positional_encodding(i_seq) for i_seq in range(self.input_len[1])])
+    def get_sinusoiding_table(self, input_len): # 연산된 pos_encodding에 i값에 따라 sin, cos을 적용
+        sinusoid_table = np.array([positional_encodding(i_seq) for i_seq in range(input_len[1])])
         sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])
         sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])
 
@@ -30,9 +27,11 @@ class Embedding(nn.Module):
     ### ~positional encodding
 
     ### embedding~
-    def forward(self):
-        embedding_input = self.embedding(self.input) / self.embedding_size**0.5 # embedding_size(d_model)의 루트로 나눠준다.
-        pos_embedding = get_sinusoiding_table()
+    def forward(self, input):
+        # input을 forward에서 받아오고 input_len을 get_sinusoding_table 함수로 보냄
+        input_len = input.size()
+        embedding_input = self.embedding(input) / self.embedding_size**0.5 # embedding_size(d_model)의 루트로 나눠준다.
+        pos_embedding = get_sinusoiding_table(input_len)
 
         return embedding_input + pos_embedding
     ### ~embedding
@@ -102,7 +101,7 @@ class masked_multi_head_attention(nn.Module):
         V_head = V_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
 
 
-        attn_mask = masking() # masked-multi-head attention을 위해 triu를 적용한 masking 사용
+        attn_mask = masking(input, Q_head.size(), K_head.size()) # masked-multi-head attention을 위해 triu를 적용한 masking 사용
         multi_attn_mask = attn_mask(input, self.Q.size(), self.K.size()).unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다
         
         # multi_attn_mask = attn_mask.unsqueeze(1).repeat(1, self.n_head, 1, 1) # multi-head 사이즈에 맞게 (Q.size(1)(bs), n_head(12), Q.size(1), K.size(1))로 바꾼다.
@@ -170,13 +169,16 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
         return self.result
 
 class GPT_pretrain(nn.Module):
-    def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head):
-        self.embedding = Embedding(input, input_size, embedding_size)
+    def __init__(self, vocab_size, n_layer, d_model, self_attn_head):
+        self.embedding = Embedding(input_size, embedding_size)
         self.transformer_block = transformer_block(embedding, vocab_size, n_layer, d_model, self_attn_head) # sentencepiece -> dataloader -> Embedding() -> trans?
         self.linear = nn.Linear(d_model, vocab_size)
+
+    def forward(self, input):
+        embedding_input = self.embedding(input)
+        
         self.linear.weight = self.embedding.embedding.weight
 
-    def forward(self):
         result_tran = self.transformer_block()
         result_linear = self.linear(result_tran)
 
