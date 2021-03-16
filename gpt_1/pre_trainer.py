@@ -134,9 +134,9 @@ class MaximumLikelihoodEstimationEngine(Engine):
 
     @staticmethod
     def attach(
-        train_engine, validation_engine,
+        train_engine, # validation_engine,
         training_metric_names = ['loss', 'ppl', '|param|', '|g_param|'],
-        validation_metric_names = ['loss', 'ppl'],
+        # validation_metric_names = ['loss', 'ppl'],
         verbose=VERBOSE_BATCH_WISE,
     ):
         # Attaching would be repaeted for serveral metrics.
@@ -169,24 +169,24 @@ class MaximumLikelihoodEstimationEngine(Engine):
                     np.exp(avg_loss),
                 ))
 
-        for metric_name in validation_metric_names:
-            attach_running_average(validation_engine, metric_name)
+        # for metric_name in validation_metric_names:
+        #     attach_running_average(validation_engine, metric_name)
 
-        if verbose >= VERBOSE_BATCH_WISE:
-            pbar = ProgressBar(bar_format=None, ncols=120)
-            pbar.attach(validation_engine, validation_metric_names)
+        # if verbose >= VERBOSE_BATCH_WISE:
+        #     pbar = ProgressBar(bar_format=None, ncols=120)
+        #     pbar.attach(validation_engine, validation_metric_names)
 
-        if verbose >= VERBOSE_EPOCH_WISE:
-            @validation_engine.on(Events.EPOCH_COMPLETED)
-            def print_valid_logs(engine):
-                avg_loss = engine.state.metrics['loss']
+        # if verbose >= VERBOSE_EPOCH_WISE:
+        #     @validation_engine.on(Events.EPOCH_COMPLETED)
+        #     def print_valid_logs(engine):
+        #         avg_loss = engine.state.metrics['loss']
 
-                print('Validation - loss={:.4e} ppl={:.2f} best_loss={:.4e} best_ppl={:.2f}'.format(
-                    avg_loss,
-                    np.exp(avg_loss),
-                    engine.best_loss,
-                    np.exp(engine.best_loss),
-                ))
+        #         print('Validation - loss={:.4e} ppl={:.2f} best_loss={:.4e} best_ppl={:.2f}'.format(
+        #             avg_loss,
+        #             np.exp(avg_loss),
+        #             engine.best_loss,
+        #             np.exp(engine.best_loss),
+        #         ))
 
     @staticmethod
     def resume_training(engine, resume_epoch):
@@ -199,7 +199,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
         if loss <= engine.best_loss:
             engine.best_loss = loss
 
-    @staticmethod
+    @staticmethod ## engine이 뭐하는 건지 알아봐야 함(이 함수는 대대적 수정 필요)
     def save_model(engine, train_engine, config, src_vocab, tgt_vocab):
         avg_train_loss = train_engine.state.metrics['loss']
         avg_valid_loss = engine.state.metrics['loss']
@@ -233,7 +233,7 @@ class MaximumLikelihoodEstimationEngine(Engine):
 
 class SingleTrainer():
 
-    def __init__(self, target_engine_class, config):
+    def __init__(self, target_engine_class, config): # target engine class가 뭐하는 건지 알아보기
         self.target_engine_class = target_engine_class
         self.config = config
 
@@ -270,24 +270,29 @@ class SingleTrainer():
         # Progress bar and metric would be attached.
         self.target_engine_class.attach(
             train_engine,
-            validation_engine,
+            # validation_engine,
             verbose=self.config.verbose
         )
 
         # After every train epoch, run 1 validation epoch.
         # Also, apply LR scheduler if it is necessary.
-        def run_validation(engine, validation_engine, valid_loader):
-            validation_engine.run(valid_loader, max_epochs=1)
+        ###
+        # def run_validation(engine, validation_engine, valid_loader):
+        #     validation_engine.run(valid_loader, max_epochs=1)
 
+        #     if engine.lr_scheduler is not None:
+        #         engine.lr_scheduler.step()
+
+        def run_lr_scheduler(engine):
             if engine.lr_scheduler is not None:
                 engine.lr_scheduler.step()
 
         # Attach above call-back function.
         train_engine.add_event_handler(
             Events.EPOCH_COMPLETED,
-            run_validation,
-            validation_engine,
-            valid_loader
+            # run_validation,
+            # validation_engine,
+            # valid_loader
         )
         # Attach other call-back function for initiation of the training.
         train_engine.add_event_handler(
@@ -296,19 +301,19 @@ class SingleTrainer():
             self.config.init_epoch,
         )
 
-        # Attach validation loss check procedure for every end of validation epoch.
-        validation_engine.add_event_handler(
-            Events.EPOCH_COMPLETED, self.target_engine_class.check_best
-        )
-        # Attach model save procedure for every end of validation epoch.
-        validation_engine.add_event_handler(
-            Events.EPOCH_COMPLETED,
-            self.target_engine_class.save_model,
-            train_engine,
-            self.config,
-            src_vocab,
-            tgt_vocab,
-        )
+        # # Attach validation loss check procedure for every end of validation epoch.
+        # validation_engine.add_event_handler(
+        #     Events.EPOCH_COMPLETED, self.target_engine_class.check_best
+        # )
+        # # Attach model save procedure for every end of validation epoch.
+        # validation_engine.add_event_handler(
+        #     Events.EPOCH_COMPLETED,
+        #     self.target_engine_class.save_model,
+        #     train_engine,
+        #     self.config,
+        #     src_vocab,
+        #     tgt_vocab,
+        # )
 
         # Start training.
         train_engine.run(train_loader, max_epochs=n_epochs)
