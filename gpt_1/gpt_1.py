@@ -36,6 +36,7 @@ class Embedding(nn.Module):
         return embedding_input + pos_embedding
     ### ~embedding
 
+
 class masking():
     def __init__(self, input, Q_size, K_size):
         self.input = input # input은 rnn_sequence_pad를 통해 패딩 된 상태의 값입니다.
@@ -54,7 +55,8 @@ class masking():
         # print(plus_result[1])
 
         return plus_result
-        
+
+
 class self_dot_attention(nn.Module):
     def __init__(self, Q, K, V): # multi-head-attention에서 나눈 Q, K, V
         super(self_dot_attention, self).__init__()
@@ -69,13 +71,14 @@ class self_dot_attention(nn.Module):
         print(matmul.size())
 
         # masking을 한다.
-        matmul.masked_fill(attn_mask, '-inf')
+        matmul.masked_fill_(attn_mask, '-inf')
 
         # mask를 추가한 값을 softmax에 넣고 V와 곱해준다.
         soft_mat = self.softmax(matmul, dim=-1)
         mul_v = torch.matmul(soft_mat, self.V)
 
         return mul_v
+
 
 class masked_multi_head_attention(nn.Module):
     def __init__(self, Q, K, V, n_head, batch_size, d_model): # d_model을 빼고 Q.size(-1)을 쓸까 고민...
@@ -92,9 +95,9 @@ class masked_multi_head_attention(nn.Module):
         self.linear_WO = nn.Linear(self.d_model, self.d_model)
 
     def forward(self, input):
-        Q_head = nn.Linear(self.Q.size(-1), self.n_head * self.head_linear) # (bs, seq, d_model)
-        K_head = nn.Linear(self.K.size(-1), self.n_head * self.head_linear)
-        V_head = nn.Linear(self.V.size(-1), self.n_head * self.head_linear)
+        Q_head = nn.Linear(self.Q.size(-1), self.n_head * self.d_head) # (bs, seq, d_model)
+        K_head = nn.Linear(self.K.size(-1), self.n_head * self.d_head)
+        V_head = nn.Linear(self.V.size(-1), self.n_head * self.d_head)
 
         Q_head = Q_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2) # (bs, seq, n_head, d_head) => (bs, n_head, seq, d_head)
         K_head = K_head.view(self.batch_size, -1, self.n_head, self.d_head).transpose(1, 2)
@@ -114,7 +117,7 @@ class masked_multi_head_attention(nn.Module):
         result = self.linear_WO(concat_result)
 
         return result
-
+        
 class position_wise_FFN(nn.Module):
     def __init__(self, d_model):
         super(position_wise_FFNN, self).__init__()
@@ -129,6 +132,7 @@ class position_wise_FFN(nn.Module):
 
         return linear_2nd
 
+
 class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_model = 768, self_attn_head = 12)
     def __init__(self, input, vocab_size, n_layer, d_model, self_attn_head = 12): ### encodding 함수에서 vocab_size를 output으로 내놓아야 할 것 ###
         super(transformer_block, self).__init__()
@@ -138,6 +142,7 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
         self.self_attn_head = self_attn_head
 
         self.result = None
+        
 
         self.masked_multi_head_attn = masked_multi_head_attention(input, input, input, n_layer, d_model, self_attn_head)
         self.position_wise = position_wise_FFN(d_model)
@@ -167,6 +172,7 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
             self.input = self.result # self.result가 self.input으로 block의 입력으로 들어간다.
 
         return self.result
+
 
 class GPT_pretrain(nn.Module):
     def __init__(self, vocab_size, n_layer, d_model, self_attn_head):
