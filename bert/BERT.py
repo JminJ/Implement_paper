@@ -59,7 +59,7 @@ class self_dot_attention(nn.Module):
 
 class multi_head_attention(nn.Module):
     def __init__(self, Q, K, V, n_head, batch_size, d_model):
-        super(multi_head_attention ,self).__init__()
+        super(multi_head_attention, self).__init__()
         self.Q = Q
         self.K = K
         self.V = V
@@ -87,4 +87,40 @@ class multi_head_attention(nn.Module):
         output = self.last_linear(concat_attentions)
 
         return output
+
+class Encoder(n.Module):
+    def __init__(self, inputs, n_head, batch_size, d_model):
+        super(Encoder, self).__init__()
+        self.inputs = inputs
+        self.n_head = n_head
+        self.batch_size = batch_size
+        self.d_model
+
+        self.m_Q = nn.Linear(self.inputs.size(-1), d_model)
+        self.m_K = nn.Linear(self.inputs.size(-1), d_model)
+        self.m_V = nn.Linear(self.inputs.size(-1), d_model)
+        
+        self.layer_norm = nn.LayerNorm(d_model)
+
+        self.ffnn_linear1 = nn.Linear(d_model * 4, d_model) # transformer에서 * 4를 취해주므로 본 코드에서도 따라갑니다.
+        self.ffnn_gelu = nn.GeLU() # ReLU 대신 GeLU를 사용합니다.
+        self.ffnn_linear2 = nn.Linear(d_model * 4, d_model) # transformer에서 * 4를 취해주므로 본 코드에서도 따라갑니다.
+
+    def add_and_norm(self, before_result, now_result):
+        add_result = before_result + now_result
+        norm_result = self.layer_norm(add_result)
+        
+        return norm_result
+
+    def feed_forward_function(self, result):
+        linear1 = self.ffnn_linear1(result)
+        gelu_result = self.ffnn_gelu(linear1)
+        linear2 = self.ffnn_linear2(gelu_result)
+
+        return linear2
+
+    def forward(self):
+        pass
+
+    
 
