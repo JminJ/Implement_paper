@@ -129,7 +129,7 @@ class Encoder(nn.Module):
 
         self.encoder_layer = Encoder_Layer(inputs, n_head, batch_size, d_model, seq_len_size)
         
-    def forward(self, inputs):
+    def forward(self, inputs, segments):
         soft_mats = []
 
         # 이미 padding 된 input이 들어온다
@@ -137,7 +137,7 @@ class Encoder(nn.Module):
         pos_mask = inputs.eq('<pad>')
         positions.masked_fill_(pos_mask, 0)
 
-        new_inputs = self.enc_emb(inputs) + self.pos_emb(inputs) + self.seg_emb(inputs)
+        new_inputs = self.enc_emb(inputs) + self.pos_emb(positions) + self.seg_emb(segments)
         attn_mask = get_attn_pad_mask(new_inputs, new_inputs, '<pad>')
 
         result, soft_mat = self.encoder_layer(new_inputs, attn_mask)
@@ -148,6 +148,49 @@ class Encoder(nn.Module):
         return result, soft_mats
 
 class BERT(nn.Module):
-    def __init__(self):
+    def __init__(self, vocab_size, n_seg_type, n_head, batch_size, d_model, seq_len_size):
         super(BERT, self).__init__()
+
+        # encoder
+        self.encoder = Encoder(vocab_size, n_seg_type, n_head, batch_size, d_model, seq_len_size)
+        self.linear = nn.Linear(d_model, d_model)
+        # activation function
+        self.activation = torch.tanh
+    
+    def forward(self, inputs, segments):
+        # encoder 실행
+        outputs, attn_probs = self.encoder(inputs)
+
+        # output에서 맨 첫 번째 값(cls token)을 가져온다
+        outputs_cls = output[:, 0].contiguous()
+        outputs_cls = self.linear(outputs)
+        outputs_cls = self.activation(outputs_cls)
+
+        return outputs, outputs_cls, attn_probs
+
+    def save(self, epoch, loss, path):
+        torch.save({
+            "epoch" : epoch,
+            "loss" : loss,
+            "state_dict" : self.state_dict()
+        }, path)
+
+    def load(self, path):
+        save = torch.load(path)
+        self.load_state_dict(save["state_dict"])
+
+        return save["epoch"], save["loss"]
+
+class BERTPretrain(nn.Module):
+    def __init__(self, vocab_size, n_seg_type, n_head, batch_size, d_model, seq_len_size):
+        super(BERTPretrain, self).__init__()
+
+        self.bert = BERT(vocab_size, n_seg_type, n_head, batch_size, d_model, seq_len_size)
+        # for NSP
+        self.projection_cls = nn.Linear(d_model, 2, bias = False)
+        # for MLM
+        self.projection_mask = nn.Linear(d_model, vocab_size, bias = False)
+        self.projection_mask.weight = self.bert.encoder.enc_emb.weight
+
+    def forward(self):
         pass
