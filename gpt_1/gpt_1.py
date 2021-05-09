@@ -118,6 +118,7 @@ class masked_multi_head_attention(nn.Module):
 
         return result
         
+        
 class position_wise_FFN(nn.Module):
     def __init__(self, d_model):
         super(position_wise_FFNN, self).__init__()
@@ -143,13 +144,12 @@ class transformer_block(nn.Module): # transformer의 decoder(n_laryer = 12, d_mo
 
         self.result = None
         
-
         self.masked_multi_head_attn = masked_multi_head_attention(input, input, input, n_layer, d_model, self_attn_head)
         self.position_wise = position_wise_FFN(d_model)
 
         self.dropout = nn.Dropout(0.1) # 각 sub-layer(Add & Norm되기 전 작업들)마다 적용해 줄 dropout
 
-    def add_and_normalization(self, before_result, now_result):
+    def add_and_normalization(self, before_result, new_result):
         new_result = before_result + now_result
 
         layer_norm = nn.LayerNorm(new_result.size())
